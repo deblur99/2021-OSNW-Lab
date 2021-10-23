@@ -10,19 +10,6 @@
 #define MAXBUF 1024
 #define MAX_CLIENTS 3
 
-/*
-struct parent_process_info {
-	pid_t pid;
-	int pstatus;
-};
-
-struct socket_process_info {
-	int client_sockfd;
-	int index; // 자식 프로세스의 순번
-	pid_t pid;
-	int pstatus; // wait 후 종료 
-};
-*/
 int main(int argc, char **argv) {
 	int server_sockfd, client_sockfd;
 	int client_len, n;
@@ -46,11 +33,103 @@ int main(int argc, char **argv) {
 
 	// 클라이언트로부터 읽어올 문자열을 연결할 변수 및 연결 횟수를 선언
 	char result[MAXBUF] = {0, };
-	int connected_count = 0;
+
 	int pstatus;
 
-	pid_t pid = fork();
+	pid_t child_pid_arr[MAX_CLIENTS] = {1, };
+	int client_sockfd_arr[MAX_CLIENTS];
 
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		client_sockfd_arr[i] = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
+		printf("New Client[%d] Connect: %s\n", i, inet_ntoa(clientaddr.sin_addr));
+		child_pid_arr[i] = fork();
+	}
+
+	if (child_pid_arr[0] > 0 && child_pid_arr[1] > 0 && child_pid_arr[2] > 0) {
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+			close(client_sockfd_arr[i]);
+		}
+		
+		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
+		
+		int pid = wait(&pstatus);
+	}
+
+	// 자식 프로세스들은 각각 클라이언트로부터 입력을 받는다.
+	if (child_pid_arr[0] == 0 && child_pid_arr[1] > 0 && child_pid_arr[2] > 0) {
+		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
+
+		// 클라이언트로부터 문자열 읽기
+		memset(buf, 0, MAXBUF);
+
+		if (read(client_sockfd_arr[0], buf, MAXBUF) > 0) {
+			printf("\nfrom Client[%d] : %s\n", 0, buf);
+
+			buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0) {
+				strcpy(result, buf);
+			} else {
+				strcat(result, buf);
+			}
+
+		} else {
+			perror("write error : ");
+			close(client_sockfd_arr[0]);
+			exit(1);
+		}
+	}
+
+	if (child_pid_arr[0] > 0 && child_pid_arr[1] == 0 && child_pid_arr[2] > 0) {
+		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
+
+		// 클라이언트로부터 문자열 읽기
+		memset(buf, 0, MAXBUF);
+
+		if (read(client_sockfd_arr[1], buf, MAXBUF) > 0) {
+			printf("\nfrom Client[%d] : %s\n", 1, buf);
+
+			buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0) {
+				strcpy(result, buf);
+			} else {
+				strcat(result, buf);
+			}
+
+		} else {
+			perror("write error : ");
+			close(client_sockfd_arr[1]);
+			exit(1);
+		}
+	}
+
+	if (child_pid_arr[0] > 0 && child_pid_arr[1] > 0 && child_pid_arr[2] == 0) {
+		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
+
+		// 클라이언트로부터 문자열 읽기
+		memset(buf, 0, MAXBUF);
+
+		if (read(client_sockfd_arr[2], buf, MAXBUF) > 0) {
+			printf("\nfrom Client[%d] : %s\n", 2, buf);
+
+			buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0) {
+				strcpy(result, buf);
+			} else {
+				strcat(result, buf);
+			}
+
+		} else {
+			perror("write error : ");
+			close(client_sockfd_arr[2]);
+			exit(1);
+		}
+	}
+
+	getchar();
+	/*
 	for (int i = 0; i < 3; i++) {
 		if (pid > 0) {
 			// debug
@@ -59,7 +138,7 @@ int main(int argc, char **argv) {
 			client_sockfd = accept(
 				server_sockfd, (struct sockaddr *)&clientaddr, &client_len
 			);
-			
+
 		} else if (pid == 0) {
 			pid = getppid();
 			i--;
@@ -89,7 +168,7 @@ int main(int argc, char **argv) {
 
 		close(client_sockfd);
 	}*/
-	
+	/*
 	if (pid > 0) {}
 	// 자식 프로세스는 클라이언트 소켓과의 read, write 수행
 	else if (pid == 0) {
@@ -113,7 +192,7 @@ int main(int argc, char **argv) {
 			exit(1);
 		}
 	}
-
+	*/
 	return 0;
 }
 
