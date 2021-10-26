@@ -1,0 +1,9 @@
+{
+    "python.pythonPath": "/home/deblur99/anaconda3/bin/python",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "files.associations": {
+        "cstdio": "cpp",
+        "algorithm": "c"
+    }
+}

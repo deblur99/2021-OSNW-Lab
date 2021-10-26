@@ -10,295 +10,269 @@
 #define MAXBUF 1024
 #define MAX_CLIENTS 3
 
+char* read_from_client(int fd, int idx);
+
+int write_to_client(int fd, char result[]);
+
 int main(int argc, char **argv) {
-	int server_sockfd, client_sockfd;
+
+    // 소켓 관련 변수, 버퍼 관련 변수 선언 및 초기화
+	int server_sockfd, client_sockfd; // 각각 listen 소켓, connect 소켓
 	int client_len, n;
-	char buf[MAXBUF]; // for read(), write()
+	int client_sockfd_arr[MAX_CLIENTS] = {-1, };
+	int pstatus;
+    int p_pid, pid1, pid2, pid3;
+	
 	struct sockaddr_in clientaddr, serveraddr;
 	client_len = sizeof(clientaddr);
 
+	static int count = 0; // 문자열 읽은 횟수
+
+	char result[MAXBUF] = {0x00, };
+
+    // listen 소켓을 생성
 	if ((server_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
 		perror("socket error : ");
 		exit(0);
 	}
 
+    // 서버 관련 구조체를 초기화
 	memset(&serveraddr, 0x00, sizeof(serveraddr));
-
 	serveraddr.sin_family = AF_INET;
 	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serveraddr.sin_port = htons(atoi(argv[1]));
 
-	bind (server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    // 서버 관련 구조체의 정보와 listen 소켓을 묶음
+	if (bind(server_sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
+        printf("An error occurred\n");
+        return -1;
+    }
+
+    // 서버에서 연결 대기
 	listen(server_sockfd, 5);
 
-	// 클라이언트로부터 읽어올 문자열을 연결할 변수 및 연결 횟수를 선언
-	char result[MAXBUF] = {0, };
-
-	int pstatus;
-
-	pid_t child_pid_arr[MAX_CLIENTS] = {1, };
-	int client_sockfd_arr[MAX_CLIENTS];
-
+	// 서버와 3개의 클라이언트를 연결하여 클라이언트 소켓 배열에 각각 저장
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 		client_sockfd_arr[i] = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
 		printf("New Client[%d] Connect: %s\n", i, inet_ntoa(clientaddr.sin_addr));
-		child_pid_arr[i] = fork();
 	}
 
-	if (child_pid_arr[0] > 0 && child_pid_arr[1] > 0 && child_pid_arr[2] > 0) {
+	// 프로세스 복사
+	pid1 = fork();
+
+	if (pid1 > 0) {
+		pid2 = fork();
+	}
+
+	if (pid1 > 0 && pid2 > 0) {
+		pid3 = fork();
+	}
+
+	// 부모 프로세스에서는 connect 소켓을 닫음
+	if (pid1 > 0 && pid2 > 0 && pid3 > 0) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			close(client_sockfd_arr[i]);
 		}
-		
-		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
-		
-		int pid = wait(&pstatus);
-	}
-
-	// 자식 프로세스들은 각각 클라이언트로부터 입력을 받는다.
-	if (child_pid_arr[0] == 0 && child_pid_arr[1] > 0 && child_pid_arr[2] > 0) {
-		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
-
-		// 클라이언트로부터 문자열 읽기
-		memset(buf, 0, MAXBUF);
-
-		if (read(client_sockfd_arr[0], buf, MAXBUF) > 0) {
-			printf("\nfrom Client[%d] : %s\n", 0, buf);
-
-			buf[strlen(buf) - 1] = 32;
-
-			if (result[0] == 0) {
-				strcpy(result, buf);
-			} else {
-				strcat(result, buf);
-			}
-
-		} else {
-			perror("write error : ");
-			close(client_sockfd_arr[0]);
-			exit(1);
-		}
-	}
-
-	if (child_pid_arr[0] > 0 && child_pid_arr[1] == 0 && child_pid_arr[2] > 0) {
-		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
-
-		// 클라이언트로부터 문자열 읽기
-		memset(buf, 0, MAXBUF);
-
-		if (read(client_sockfd_arr[1], buf, MAXBUF) > 0) {
-			printf("\nfrom Client[%d] : %s\n", 1, buf);
-
-			buf[strlen(buf) - 1] = 32;
-
-			if (result[0] == 0) {
-				strcpy(result, buf);
-			} else {
-				strcat(result, buf);
-			}
-
-		} else {
-			perror("write error : ");
-			close(client_sockfd_arr[1]);
-			exit(1);
-		}
-	}
-
-	if (child_pid_arr[0] > 0 && child_pid_arr[1] > 0 && child_pid_arr[2] == 0) {
-		printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid()); // debug
-
-		// 클라이언트로부터 문자열 읽기
-		memset(buf, 0, MAXBUF);
-
-		if (read(client_sockfd_arr[2], buf, MAXBUF) > 0) {
-			printf("\nfrom Client[%d] : %s\n", 2, buf);
-
-			buf[strlen(buf) - 1] = 32;
-
-			if (result[0] == 0) {
-				strcpy(result, buf);
-			} else {
-				strcat(result, buf);
-			}
-
-		} else {
-			perror("write error : ");
-			close(client_sockfd_arr[2]);
-			exit(1);
-		}
-	}
-
-	getchar();
-	/*
-	for (int i = 0; i < 3; i++) {
-		if (pid > 0) {
-			// debug
-			printf("현재 프로세스 : %d, 부모 프로세스 : %d\n", getpid(), getppid());
-
-			client_sockfd = accept(
-				server_sockfd, (struct sockaddr *)&clientaddr, &client_len
-			);
-
-		} else if (pid == 0) {
-			pid = getppid();
-			i--;
-		}
-	}
+	} 
 	
-	// debug
-	getchar();
-
-	// 부모 프로세스가 클라이언트 연결 및 복사 수행
-	for (int i = 0; i < MAX_CLIENTS - 1; i++) {
-		client_sockfd = accept(
-			server_sockfd, (struct sockaddr *)&clientaddr, &client_len
-		);
-
-		printf("New Client[%d] Connect: %s\n", i, inet_ntoa(clientaddr.sin_addr));
-
-		pid = fork();
+	// 자식 프로세스에서는 listen 소켓을 닫음
+	else { 
+		close(server_sockfd);
 	}
-	/*
-		// debug
-		getchar();
 
-		sleep(2); // temp
+	// 부모 프로세스는 자식 프로세스에서의 통신이 끝날 때까지 대기한다.
+	// 모두 끝나면 부모 프로세스의 listen 소켓을 닫는다.
+	if (pid1 > 0 && pid2 > 0 && pid3 > 0) {
+		p_pid = wait(&pstatus);
 
-		pid = wait(&pstatus); // 자식 프로세스들이 처리될 때까지 대기. 자식 프로세스들이 모두 실행된다.
-
-		close(client_sockfd);
-	}*/
-	/*
-	if (pid > 0) {}
-	// 자식 프로세스는 클라이언트 소켓과의 read, write 수행
-	else if (pid == 0) {
 		close(server_sockfd);
 
-		// 클라이언트로부터 문자열 읽기
-		if (read(client_sockfd, buf, MAXBUF) > 0) {
-			printf("\nfrom Client[%d] : %s\n", connected_count++, buf);
+		return 0;
+	}
 
-			buf[strlen(buf) - 1] = 32;
+	char buf[MAXBUF]; // for read(), write()
 
-			if (result[0] == 0) {
+	// read : 클라이언트로부터 문자열 읽기
+	
+		if (pid1 == 0 && pid2 > 0 && pid3 > 0) {
+		
+			memset(buf, 0x00, MAXBUF);
+
+			if ((n = read(client_sockfd_arr[0], buf, MAXBUF)) > 0) {
+				printf("\nfrom Client[%d] : %s\n", 0, buf);
+				buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0x00) {
 				strcpy(result, buf);
-			} else {
+			}
+			else {
 				strcat(result, buf);
 			}
 
-		} else {
-			perror("write error : ");
-			close(client_sockfd);
-			exit(1);
+			count++;
+		}
+		} 
+	
+		if (pid1 > 0 && pid2 == 0 && pid3 > 0) {
+			memset(buf, 0x00, MAXBUF);
+
+		if ((n = read(client_sockfd_arr[1], buf, MAXBUF)) > 0) {
+			printf("\nfrom Client[%d] : %s\n", 1, buf);
+			buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0x00) {
+				strcpy(result, buf);
+			}
+			else {
+				strcat(result, buf);
+			}
+
+			count++;
+		}
+	} 
+	
+	if (pid1 > 0 && pid2 > 0 && pid3 == 0) {
+		memset(buf, 0x00, MAXBUF);
+
+		if ((n = read(client_sockfd_arr[2], buf, MAXBUF)) > 0) {
+			printf("\nfrom Client[%d] : %s\n", 2, buf);
+			buf[strlen(buf) - 1] = 32;
+
+			if (result[0] == 0x00) {
+				strcpy(result, buf);
+			}
+			else {
+				strcat(result, buf);
+			}
+
+			count++;
+		}
+		}
+	
+
+	// write
+	for (;;) {
+		if (count >= MAX_CLIENTS) {
+			if (pid1 == 0 && pid2 > 0 && pid3 > 0) {
+				if ((n = write(client_sockfd_arr[0], result, MAXBUF)) <= 0) {
+					perror("read error : ");
+				}
+
+				close(client_sockfd_arr[0]);
+				exit(0);
+			} 
+	
+			if (pid1 > 0 && pid2 == 0 && pid3 > 0) {
+				if ((n = write(client_sockfd_arr[1], result, MAXBUF)) <= 0) {
+					perror("read error : ");
+				}
+
+				close(client_sockfd_arr[1]);
+				exit(0);
+			} 
+	
+			if (pid1 > 0 && pid2 > 0 && pid3 == 0) {
+				if ((n = write(client_sockfd_arr[2], result, MAXBUF)) <= 0) {
+					perror("read error : ");
+				}
+
+				close(client_sockfd_arr[2]);
+				exit(0);
+			}
+
+			break;
+		}
+		else {
+			sleep(1);
 		}
 	}
-	*/
+		
 	return 0;
-}
-
-	//int socket_list[3] = {-1, };
-/*
-	for (connected_count = 0; connected_count < MAX_CLIENTS; connected_count++) {
-		client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr,
-		&client_len);
-		client_arr[connected_count].client_sockfd = client_sockfd;
-		client_arr[connected_count].pid = fork(); // 자식 프로세스 각각 생성
-		printf("New Client[%d] Connect: %s\n", connected_count, inet_ntoa(clientaddr.sin_addr));
-	}
-*/
-	/*
-	for (connected_count = 0; connected_count < MAX_CLIENTS; connected_count++) {
-		child_arr[connected_count].pid = fork(); // 자식 프로세스 생성
-	}*/
+}	
 
 	/*
 	for (;;) {
-		
-		if (child_count >= 3) {
-			break;
-		}
+    	if ((pid = fork()) < 0) { // 복사 시 오류 발생하면 예외 처리
+    	    printf("An error occurred\n");
+    	    return -1;
 
-		pid = fork();
-		child_count++;
+    	} else if (pid > 0) { // 부모 프로세스
 
-		if (pid < 0) { // 자식 프로세스 복사 실패
-			printf("Fork failure\n");
-			exit(1); // 자식 프로세스 종료
-			
-		} else if (child_arr[connected_count].pid > 0) { // 부모 프로세스일 때
-			// 연결이 완료되면, 자식 프로세스가 클라이언트와 통신
-			parent.pid = wait(parent.pstatus);
-			
-		} else { // 자식 프로세스일 때
-			// 소켓 연결
-			client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
-
-			printf("New Client[%d] Connect: %s\n", child_count, inet_ntoa(clientaddr.sin_addr));
-
-			memset(buf, 0x00, MAXBUF);
-
-			// 클라이언트로부터 문자열 읽기
-			if (read(client_sockfd, buf, MAXBUF) > 0) {
-				printf("\nfrom Client[%d] : %s\n", child_count, buf);
-
-				buf[strlen(buf) - 1] = 32;
-
-				if (result[0] == 0) {
-					strcpy(result, buf);
-				} else {
-					strcat(result, buf);
-				}
-
-			} else {
-				perror("write error : ");
-				close(client_sockfd);
-				exit(1);
-			}
-
-			if (write(client_sockfd, result, MAXBUF) <= 0) {
-				perror("write error : ");
-				close(client_sockfd);
-				exit(1);
-			}
-
-			exit(0);
-		}
-	}
+			for (int i = 0; i < MAX_CLIENTS; i++)
+    	    	close(client_sockfd_arr[i]); 
 	
-	for (connected_count = 0; connected_count < MAX_CLIENTS; connected_count++) {
-		memset(buf, 0x00, MAXBUF);
+    	    pid = wait(&pstatus); // 자식 프로세스가 끝날 때까지 대기
 
-		if (read(client_arr[connected_count].client_sockfd, buf, MAXBUF) > 0) {
-			printf("\nfrom Client[%d] : %s\n", connected_count, buf);
-			buf[strlen(buf) - 1] = 32;
-			if (result[0] == 0x00) {
+			close(server_sockfd);
+
+    	} else if (pid == 0) { // 자식 프로세스
+			int process_idx = -1;
+
+			for (int i = 0; i < MAX_CLIENTS; i++) {
+				if (child_pid_arr[i] != -1) {
+					break;
+				} else {
+					child_pid_arr[i] = getpid();
+					process_idx = i;
+					break;
+				}
+			}
+
+    	    close(server_sockfd); // 자식 프로세스에서는 listen 소켓을 닫음
+
+    	    // 클라이언트로부터 문자열 읽기
+			memset(buf, 0, MAXBUF);
+			strcpy(buf, read_from_client(client_sockfd_arr[process_idx]));
+
+			printf("New Client[%d] Connect : %s\n", process_idx, inet_ntoa(clientaddr.sin_addr));
+
+			// 문자열을 결과 문자열에 이어 붙이고 작업 종료 -> 대기해야 하는 건가?
+			if (result[0] == '\0') {
 				strcpy(result, buf);
 			} else {
 				strcat(result, buf);
+			}		
+
+			buf[strlen(buf) - 1] = 32; // 문자열 간 공백 문자 삽입
+
+			count++;
+
+			while (count != MAX_CLIENTS) {
+				sleep(1);
 			}
 
-		} else {
-			perror("write error : ");
-			close(client_arr[connected_count].client_sockfd);
-		}
+			// 결과 문자열이 모두 합쳐지면 클라이언트들에게 결과 문자열 전송
+			write_to_client(client_sockfd_arr[process_idx], result);
+
+			close(client_sockfd_arr[process_idx]); // 자식 프로세스가 할 일을 끝내면 connect 소켓 닫음
+    	}
+
+    	return 0;
+	}  
+	*/
+
+/*
+char* read_from_client(int fd, int idx) {
+	char buf[MAXBUF] = {0, };
+
+	if (read(fd, buf, MAXBUF) > 0) {
+		printf("\nfrom Client[%d] : %s\n", idx, buf);
+	} else {
+		perror("read error : ");
+		close(fd);
+		exit(-1);
 	}
 
-	memset(buf, 0x00, MAXBUF);
+	return buf;
+}
 
-	for (connected_count = 0; connected_count < MAX_CLIENTS; connected_count++) {
-		if (write(client_arr[connected_count].client_sockfd, result, MAXBUF) <= 0) {
-			perror("write error : ");
-			close(client_arr[connected_count].client_sockfd);
-		}
+int write_to_client(int fd, char result[]) {
+	if (write(fd, result, MAXBUF) <= 0) {
+		perror("write error : ");
+		close(fd);
+		exit(-1);
+	} else {
+		return 1;
 	}
-	
-	for (connected_count = 0; connected_count < MAX_CLIENTS; connected_count++) {
-		close(client_arr[connected_count].client_sockfd);
-	}
-
-	getchar(); // debug
-
-	close(server_sockfd);
-	return 0;
 }
 */
