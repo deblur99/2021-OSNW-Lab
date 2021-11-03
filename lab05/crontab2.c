@@ -10,5 +10,5 @@ void main()
 
 	t = time(NULL);
 	tm = localtime(&t);
-	printf("starting job by crontab2 at %s\n", asctime(tm)); 
+	printf("한현민 at %s\n", asctime(tm)); 
 }
