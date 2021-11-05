@@ -10,10 +10,6 @@
 #define MAXBUF 1024
 #define MAX_CLIENTS 3
 
-char* read_from_client(int fd, int idx);
-
-int write_to_client(int fd, char result[]);
-
 int main(int argc, char **argv) {
 
     // 소켓 관련 변수, 버퍼 관련 변수 선언 및 초기화
@@ -28,7 +24,6 @@ int main(int argc, char **argv) {
 
 	static int count = 0; // 문자열 읽은 횟수
 
-	char result[MAXBUF] = {0x00, };
 
     // listen 소켓을 생성
 	if ((server_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
@@ -109,8 +104,8 @@ int main(int argc, char **argv) {
 				strcat(result, buf);
 			}
 
-			count++;
-		}
+				count++;
+			}
 		} 
 	
 		if (pid1 > 0 && pid2 == 0 && pid3 > 0) {
@@ -147,7 +142,7 @@ int main(int argc, char **argv) {
 
 			count++;
 		}
-		}
+	}
 	
 
 	// write

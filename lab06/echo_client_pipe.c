@@ -1,25 +1,27 @@
 #include <sys/types.h>
-
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 
+#define READ 0
+#define WRITE 1
+
 #define MAXLINE 1024
 int main(int argc, char **argv)
 {
-	int rfd, wfd;
+	int fd[2];
 	char buf[MAXLINE];
 
-	rfd = open("/tmp/myfifo_w", O_RDWR);
-	if(rfd < 0)
+	fd[READ] = open("/tmp/myfifo_w", O_RDWR);
+	if(fd[READ] < 0)
 	{
 		perror("read open error\n");
 		return 1;
 	}
-	wfd = open("/tmp/myfifo_r", O_RDWR);
-	if(wfd < 0)
+	fd[WRITE] = open("/tmp/myfifo_r", O_RDWR);
+	if(fd[WRITE] < 0)
 	{
 		perror("write open error\n");
 		return 1;
@@ -35,12 +37,12 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		if(strncmp(buf, "quit\n",5) == 0) break;
-		write(wfd, buf, strlen(buf));
-		read(rfd, buf, MAXLINE);
-		printf("Server -> %s",buf);
+		write(fd[WRITE], buf, strlen(buf));
+		read(fd[READ], buf, MAXLINE);
+		printf("Server -> %s", buf);
 	}
-	close(wfd);
-	close(rfd);
+	close(fd[WRITE]);
+	close(fd[READ]);
 	return 0;
 }
 
