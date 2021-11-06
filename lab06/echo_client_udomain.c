@@ -14,11 +14,13 @@ int main(int argc, char **argv)
 	int clilen; 
 	char buf[MAXLINE]; 
 	struct sockaddr_un sock_addr; 
+
 	if(argc != 2) 
 	{ 
 		printf("Usage : %s [socket file name]\n", argv[0]); 
 		return 1; 
 	} 
+
 	if (access(argv[1], R_OK)  == -1) 
 	{ 
 		printf("socket File access error\n"); 
@@ -39,4 +41,4 @@ int main(int argc, char **argv)
 	printf("Server -> %s", buf); // 출력
 	
 	return 0; 
-} 
+}
