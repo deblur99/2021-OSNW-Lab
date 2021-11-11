@@ -86,6 +86,8 @@ int main(int argc, char **argv) {
 	}
 
 	char buf[MAXBUF]; // for read(), write()
+	char result[MAXBUF];
+	memset(result, 0, sizeof(result));
 
 	// read : 클라이언트로부터 문자열 읽기
 	
