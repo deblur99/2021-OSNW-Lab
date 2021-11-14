@@ -1,10 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 
 void sig_handler(int signo)
 {
     printf("SIGINT received : %d\n", signo);
+    exit(1);
 }
 
 int main()

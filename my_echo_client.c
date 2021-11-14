@@ -4,8 +4,15 @@
 #include <stdio.h>      /* 표준 입출력 관련 */
 #include <string.h>     /* 문자열 관련 */
 #include <unistd.h>     /* 각종 시스템 함수 */
+#include <signal.h>
 
 #define MAXLINE    1024
+
+// SIGINT가 발생하면 프로그램 종료
+int sig_handler(int signo)
+{
+    exit(0);
+}
 
 int main(int argc, char **argv)
 {
@@ -42,16 +49,20 @@ int main(int argc, char **argv)
         perror("write error : ");
         return 1;
     }
+    
+    signal(SIGINT, (void *)sig_handler); // 시그널 핸들러 함수 호출
 
-    memset(buf, 0x00, MAXLINE);
-    /* 서버로 부터 데이터를 읽는다. */
-    if (read(server_sockfd, buf, MAXLINE) <= 0)
-    {
-        perror("read error : ");
-        return 1;
+    for (;;) {
+        memset(buf, 0x00, MAXLINE);
+        /* 서버로 부터 데이터를 읽는다. */
+        if (read(server_sockfd, buf, MAXLINE) <= 0)
+        {
+            perror("read error : ");
+            return 1;
+        }
+
+        printf("read : %s", buf);
     }
-    printf("read : %s", buf);
-    close(server_sockfd);
     
     return 0;
 }
