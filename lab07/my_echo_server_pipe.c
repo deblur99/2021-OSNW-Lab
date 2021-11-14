@@ -22,6 +22,10 @@
 	// 5. 각 자식 프로세스는 부모 프로세스로부터 문자열을 받고, 연결된 클라이언트에 문자열을 전송함
 	// 6. connect, listen 소켓 닫고 자식 프로세스 -> 부모 프로세스 순으로 종료
 
+struct data {
+	
+};
+
 int main(int argc, char **argv) {
 
     // 소켓 관련 변수, 버퍼 관련 변수 선언 및 초기화
@@ -131,6 +135,16 @@ int main(int argc, char **argv) {
 		// 생산자, 소비자 프로세스 생성
 		int pid1_prod, pid1_cons;
 
+		pid1_prod = fork(); // 생산자
+
+		if (pid1_prod > 0) {
+			pid1_cons = fork(); // 소비자
+		}
+
+		
+
+
+
 		memset(buf, 0x00, MAXBUF);
 
 		if ((n = read(client_fd_arr[0], buf, MAXBUF)) > 0) {
@@ -192,7 +206,7 @@ int main(int argc, char **argv) {
 	if (pid3 == 0) {
 		// 생산자, 소비자 프로세스 생성
 		int pid3_prod, pid3_cons;
-		
+
 		memset(buf, 0x00, MAXBUF);
 
 		if ((n = read(client_fd_arr[2], buf, MAXBUF)) > 0) {
