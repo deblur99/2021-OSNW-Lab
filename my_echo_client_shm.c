@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     struct Data myData = {{0, }, -1};
 
     if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("error :");
+        perror("error");
         return 1;
     }
 
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
 
     /* 서버에 연결을 시도한다. */
     if (connect(server_sockfd, (struct sockaddr *)&serveraddr, client_len)  == -1) {
-        perror("connect error :");
+        perror("connect error");
         return 1;
     }
 
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
     /* 입력 받은 데이터를 서버로 전송한다. */
     if (write(server_sockfd, &myData, sizeof(myData)) <= 0) {
-        perror("write error : ");
+        perror("write error");
         return 1;
     }
 
@@ -68,11 +68,13 @@ int main(int argc, char **argv) {
         /* 서버로 부터 데이터를 읽는다. */
         if (read(server_sockfd, &myData, sizeof(myData)) <= 0)
         {
-            perror("read error : "); // 예외
+            perror("read error"); // 예외
             return 1;
         }
 
         printf("read : %s and %d\n", myData.msg, myData.num); // 출력
+        
+        sleep(1);
     }
 
     return 0;
