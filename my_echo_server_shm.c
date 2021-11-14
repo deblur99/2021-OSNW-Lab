@@ -36,21 +36,29 @@ struct Data {
 };
 
 union semun {
-	struct Data val;
+	int val;
+	struct Data *data;
 };
 
 struct Data* handleData(struct Data *data) {
+	char result[MAXBUF] = {0, };
+
 	char temp;
+
+	strcpy(result, data->msg);
 
 	// 문자열 처리
 	for (int i = 0; i < strlen(data->msg) - 1; i++) {
-		temp = data->msg[i];
-		data->msg[i] = data->msg[i + 1];
-		data->msg[i + 1] = temp;
+		temp = result[i];
+		result[i] = result[i + 1];
+		result[i + 1] = temp;
 	}
 
 	// 정수 처리
 	data->num += 1;
+
+	memset(data->msg, 0, sizeof(data->msg));
+	strcpy(data->msg, result);
 
 	//debug
 	printf("%s, %d\n", data->msg, data->num);
@@ -157,8 +165,11 @@ int main(int argc, char **argv) {
 			struct Data *sharedData;
 			union semun sem_union;
 
-			strcpy(sem_union.val.msg, myData.msg);
-			sem_union.val.num = myData.num;
+			sem_union.val = 0;
+			strcpy(sem_union.data->msg, myData.msg);
+			sem_union.data->num = myData.num;
+
+			sharedData = (struct Data *)sharedMemory;
 
 			// 소비자 프로세스 생성
 			int pid_cons = fork();
@@ -166,75 +177,85 @@ int main(int argc, char **argv) {
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
 				struct Data *local_var, *cal_data;
-
-				if ((shmid = shmget((key_t)1234, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				
+				if ((shmid = shmget((key_t)5, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+					perror("shmget error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)3477, 1, IPC_CREAT|0666)) == -1) {
+				if ((semid = semget((key_t)32769, 1, IPC_CREAT|0666)) == -1) {
+					perror("semget error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("shmat error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("semctl error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("semop error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
 
-					sleep(1);
-
 					cal_data = local_var;
 
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 
 			if (pid_cons == 0) {
 				struct Data *local_var, *cal_data;
 
-				if ((shmid = shmget((key_t)1234, sizeof(myData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)5, sizeof(myData), 0666)) == -1) {
+					perror("error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)3477, 0, 0666)) == -1) {
+				if ((semid = semget((key_t)32769, 0, 0666)) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
-					
-					sleep(1);
 	
 					write(client_arr[0].fd, cal_data, sizeof(cal_data));
 	
 					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 		}
@@ -262,10 +283,11 @@ int main(int argc, char **argv) {
 			struct Data *sharedData;
 			union semun sem_union;
 
-			sharedData = (struct Data *)sharedMemory;
+			sem_union.val = 0;
+			strcpy(sem_union.data->msg, myData.msg);
+			sem_union.data->num = myData.num;
 
-			strcpy(sem_union.val.msg, myData.msg);
-			sem_union.val.num = myData.num;
+			sharedData = (struct Data *)sharedMemory;
 
 			// 소비자 프로세스 생성
 			int pid_cons = fork();
@@ -274,74 +296,84 @@ int main(int argc, char **argv) {
 			if (pid_cons > 0) {
 				struct Data *local_var, *cal_data;
 
-				if ((shmid = shmget((key_t)2345, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				if ((shmid = shmget((key_t)163841, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+					perror("error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)3999, 1, IPC_CREAT|0666)) == -1) {
+				if ((semid = semget((key_t)165000, 1, IPC_CREAT|0666)) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
 
-					sleep(1);
-
 					cal_data = local_var;
 
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 
 			if (pid_cons == 0) {
 				struct Data *local_var, *cal_data;
 
-				if ((shmid = shmget((key_t)2345, sizeof(myData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)163841, sizeof(myData), 0666)) == -1) {
+					perror("error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)3999, 0, 0666)) == -1) {
+				if ((semid = semget((key_t)165000, 0, 0666)) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
-					
-					sleep(1);
 	
 					write(client_arr[1].fd, cal_data, sizeof(cal_data));
 	
 					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 		}
@@ -368,10 +400,14 @@ int main(int argc, char **argv) {
 			struct Data *sharedData;
 			union semun sem_union;
 
-			sharedData = (struct Data *)sharedMemory;
+			sem_union.val = 0;
+			strcpy(sem_union.data->msg, myData.msg);
+			sem_union.data->num = myData.num;
 
-			strcpy(sem_union.val.msg, myData.msg);
-			sem_union.val.num = myData.num;
+			// debug
+			printf("%d, %s, %d\n", sem_union.val, sem_union.data->msg, sem_union.data->num);
+			
+			sharedData = (struct Data *)sharedMemory;
 
 			// 소비자 프로세스 생성
 			int pid_cons = fork();
@@ -380,74 +416,84 @@ int main(int argc, char **argv) {
 			if (pid_cons > 0) {
 				struct Data *local_var, *cal_data;
 
-				if ((shmid = shmget((key_t)3456, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				if ((shmid = shmget((key_t)196610, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+					perror("shmget error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)4999, 1, IPC_CREAT|0666)) == -1) {
+				if ((semid = semget((key_t)200000, 1, IPC_CREAT|0666)) == -1) {
+					perror("semget error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("sharedmemory error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("semctl error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("semop error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
 
-					sleep(1);
-
 					cal_data = local_var;
 
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 
 			if (pid_cons == 0) {
 				struct Data *local_var, *cal_data;
 
-				if ((shmid = shmget((key_t)3456, sizeof(myData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)196610, sizeof(myData), 0666)) == -1) {
+					perror("shmget error");
 					return 1;
 				}
 
-				if ((semid = semget((key_t)4999, 0, 0666)) == -1) {
+				if ((semid = semget((key_t)200000, 0, 0666)) == -1) {
+					perror("semget error");
 					return 1;
 				}
 
 				if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+					perror("sharedmemory error");
 					return 1;
 				}
 
 				cal_data = (struct Data *)sharedMemory;
 
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+					perror("semctl error");
 					return 1;
 				}
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
+						perror("semop error");
 						return 1;
 					}
 
 					local_var = handleData(cal_data);
 					
-					sleep(1);
-	
 					write(client_arr[2].fd, cal_data, sizeof(cal_data));
 	
 					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
+
+					sleep(1);
 				}
 			}
 		}

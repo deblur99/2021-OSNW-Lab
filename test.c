@@ -7,7 +7,7 @@ struct Data {
     int num;
 };
 
-int main() {
+void test1() {
     struct Data myData;
 
     char buf[1024];
@@ -26,10 +26,24 @@ int main() {
         myData.num = atoi(tok);
 
     } else {
-        return 1;
+        return;
     }
 
     printf("%s %d\n", myData.msg, myData.num);
     
+    return;
+}
+
+int main() {
+    struct Data *data = {"Change the world", 42};
+
+    char *foo;
+
+    foo = data->msg;
+
+    foo[0] = "G";
+
+    printf("%s\n", foo);
+
     return 0;
 }
