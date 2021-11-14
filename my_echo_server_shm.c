@@ -1,6 +1,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h> // for wait()
+#include <sys/shm.h> // for shared memory
+#include <sys/sem.h> // for semaphore
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,22 +22,53 @@ int sig_handler(int signo) {
     exit(0);
 }
 
+// 소켓 정보를 저장할 구조체
+struct ClientSocketInfo {
+	int fd;
+	char addr[20];
+	unsigned short port;	
+};
+
 // 클라이언트와 주고받을 구조체
 struct Data {
     char msg[MAXBUF];
     int num;
 };
 
+union semun {
+	struct Data val;
+};
+
+struct Data* handleData(struct Data *data) {
+	char temp;
+
+	// 문자열 처리
+	for (int i = 0; i < strlen(data->msg) - 1; i++) {
+		temp = data->msg[i];
+		data->msg[i] = data->msg[i + 1];
+		data->msg[i + 1] = temp;
+	}
+
+	// 정수 처리
+	data->num += 1;
+
+	return data;
+}
+
 int main(int argc, char **argv) {
 	// 시그널 핸들러 함수 호출
     signal(SIGINT, (void *)sig_handler); 
+
+	// 세마포어
+	struct sembuf semopen = {0, -1, SEM_UNDO};
+	struct sembuf semclose = {0, 1, SEM_UNDO};
 
 	struct Data myData = {{0, }, -1};
 
     // 소켓 관련 변수, 버퍼 관련 변수 선언 및 초기화
 	int listen_fd, client_fd; // 각각 listen 소켓, connect 소켓
 	int client_len, n;
-	int client_fd_arr[MAX_CLIENTS] = {-1, };
+	struct ClientSocketInfo client_arr[MAX_CLIENTS];
 
 	// 클라이언트와 연결될 자식 프로세스의 PID
     int pid1, pid2, pid3;
@@ -67,7 +100,9 @@ int main(int argc, char **argv) {
 
 	// 서버와 3개의 클라이언트를 연결하여 클라이언트 소켓 배열에 각각 저장
 	for (int i = 0; i < MAX_CLIENTS; i++) {
-		client_fd_arr[i] = accept(listen_fd, (struct sockaddr *)&clientaddr, &client_len);
+		client_arr[i].fd = accept(listen_fd, (struct sockaddr *)&clientaddr, &client_len);
+		strcpy(client_arr[i].addr, inet_ntoa(clientaddr.sin_addr));
+		client_arr[i].port = ntohs(clientaddr.sin_port);
 	}
 
 	// 프로세스 복사
@@ -84,7 +119,7 @@ int main(int argc, char **argv) {
 	// 부모 프로세스에서는 connect 소켓을 닫음
 	if (pid1 > 0 && pid2 > 0 && pid3 > 0) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
-			close(client_fd_arr[i]);
+			close(client_arr[i].fd);
 		}
 	} 
 	
@@ -96,123 +131,241 @@ int main(int argc, char **argv) {
 	// 부모 프로세스는 자식 프로세스에서의 통신이 끝날 때까지 대기한다.
 	// 모두 끝나면 부모 프로세스의 listen 소켓을 닫는다.
 	if (pid1 > 0 && pid2 > 0 && pid3 > 0) {
+		int pstatus;
+
+		pstatus = wait(&pstatus);
+		
 		close(listen_fd);
 	}
 
 	// 자식 프로세스 1
 	if (pid1 == 0) {
 		
-		if ((n = read(client_fd_arr[0], &myData, sizeof(myData))) > 0) {
+		if ((n = read(client_arr[0].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
-			printf("\nRead Data %s(%d) : %d and %s",
-				inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), 
+			printf("Read Data %s(%d) : %d and %s\n",
+				client_arr[0].addr, client_arr[0].port, 
 				myData.num, myData.msg);
 
-			// 공유 메모리 할당
-			
+			// myData 크기만큼 공유 메모리 및 세마포어 할당 및 생성
+			int shmid, semid;
+			void *sharedMemory = NULL;
+			struct Data *sharedData;
+			union semun sem_union;
 
-			// 생산자, 소비자 프로세스 생성
-			int pid1_prod, pid1_cons;
-
-			pid1_prod = fork(); // 생산자
-
-			if (pid1_prod > 0) {
-				pid1_cons = fork(); // 소비자
+			if ((shmid = shmget((key_t)1234, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				return 1;
 			}
 
-			// debug
-			getchar();
-			getchar();
+			if ((semid = semget((key_t)3477, 1, IPC_CREAT|0666)) == -1) {
+				return 1;
+			}
 
-			// 결과값 쓰기 -> 생산자, 소비자 분리해서 각각 보내는 걸로 구현하기
-			write(client_fd_arr[0], &myData, sizeof(myData));
-			
-			close(client_fd_arr[0]);
+			if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+				return 1;
+			}
 
-			exit(0);
+			sharedData = (struct Data *)sharedMemory;
+
+			strcpy(sem_union.val.msg, myData.msg);
+			sem_union.val.num = myData.num;
+		
+			if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+				return 1;
+			}
+
+			// 생산자, 소비자 프로세스 생성
+			int pid_prod, pid_cons;
+
+			pid_prod = fork(); // 생산자
+
+			if (pid_prod > 0) {
+				pid_cons = fork(); // 소비자
+			}
+
+			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
+			for (;;) {
+				if (pid_prod == 0) {
+					struct Data local_var;
+
+					if (semop(semid, &semopen, 1) == -1) {
+						return 1;
+					}
+
+					local_var = *handleData(sharedData);
+
+					sleep(1);
+
+					sharedData = &local_var;
+
+					semop(semid, &semclose, 1);
+				}
+
+				if (pid_cons == 0) {
+					struct Data local_var;
+
+					if (semop(semid, &semopen, 1) == -1) {
+						return 1;
+					}
+
+					local_var = *handleData(sharedData);
+					
+					sleep(1);
+
+					write(client_arr[0].fd, &sharedData, sizeof(sharedData));
+
+					sharedData = &local_var;
+
+					semop(semid, &semclose, 1);
+				}
+			}
 
 		} else {
 			perror("failed to read");
-			close(client_fd_arr[0]);
+			close(client_arr[0].fd);
 			return -1;
 		}
 	} 
 
 	// 자식 프로세스 2
 	if (pid2 == 0) {
-		if ((n = read(client_fd_arr[1], &myData, sizeof(myData))) > 0) {
+		if ((n = read(client_arr[1].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
-			printf("\nRead Data %s(%d) : %d and %s",
-				inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), 
+			printf("Read Data %s(%d) : %d and %s\n",
+				client_arr[1].addr, client_arr[1].port, 
 				myData.num, myData.msg);
 
-			// 공유 메모리 할당
-			
+			// myData 크기만큼 공유 메모리 및 세마포어 할당 및 생성
+			int shmid, semid;
+			void *sharedMemory = NULL;
+			struct Data *sharedData;
+			union semun sem_union;
 
-			// 생산자, 소비자 프로세스 생성
-			int pid2_prod, pid2_cons;
-
-			pid2_prod = fork(); // 생산자
-
-			if (pid2_prod > 0) {
-				pid2_cons = fork(); // 소비자
+			if ((shmid = shmget((key_t)1234, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				return 1;
 			}
 
-			// debug
-			getchar();
-			getchar();
+			if ((semid = semget((key_t)3477, 1, IPC_CREAT|0666)) == -1) {
+				return 1;
+			}
 
-			// 결과값 쓰기 -> 생산자, 소비자 분리해서 각각 보내는 걸로 구현하기
-			write(client_fd_arr[1], &myData, sizeof(myData));
-			
-			close(client_fd_arr[1]);
+			if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+				return 1;
+			}
 
-			exit(0);
+			sharedData = (struct Data *)sharedMemory;
+
+			strcpy(sem_union.val.msg, myData.msg);
+			sem_union.val.num = myData.num;
+		
+			if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+				return 1;
+			}
+
+			// 생산자, 소비자 프로세스 생성
+			int pid_prod, pid_cons;
+
+			pid_prod = fork(); // 생산자
+
+			if (pid_prod > 0) {
+				pid_cons = fork(); // 소비자
+			}
+
+			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
+			for (;;) {
+				if (pid_prod == 0) {
+					semop(semid, &semopen, 1);
+					sharedData = handleData(sharedData);
+					write(client_arr[1].fd, &sharedData, sizeof(sharedData));
+					sleep(1);
+					semop(semid, &semclose, 1);
+				}
+
+				if (pid_cons == 0) {
+					semop(semid, &semopen, 1);
+					sharedData = handleData(sharedData);
+					write(client_arr[1].fd, &sharedData, sizeof(sharedData));
+					sleep(1);
+					semop(semid, &semclose, 1);
+				}
+			}
 
 		} else {
 			perror("failed to read");
-			close(client_fd_arr[1]);
+			close(client_arr[1].fd);
 			return -1;
 		}
 	} 
 	
 	// 자식 프로세스 3
 	if (pid3 == 0) {
-		if ((n = read(client_fd_arr[2], &myData, sizeof(myData))) > 0) {
+		if ((n = read(client_arr[2].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
-			printf("\nRead Data %s(%d) : %d and %s",
-				inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), 
+			printf("Read Data %s(%d) : %d and %s\n",
+				client_arr[2].addr, client_arr[2].port, 
 				myData.num, myData.msg);
 
-			// 공유 메모리 할당
-			
+			// myData 크기만큼 공유 메모리 및 세마포어 할당 및 생성
+			int shmid, semid;
+			void *sharedMemory = NULL;
+			struct Data *sharedData;
+			union semun sem_union;
 
-			// 생산자, 소비자 프로세스 생성
-			int pid3_prod, pid3_cons;
-
-			pid3_prod = fork(); // 생산자
-
-			if (pid3_prod > 0) {
-				pid3_cons = fork(); // 소비자
+			if ((shmid = shmget((key_t)1234, sizeof(myData), 0666|IPC_CREAT)) == -1) {
+				return 1;
 			}
 
-			// debug
-			getchar();
-			getchar();
+			if ((semid = semget((key_t)3477, 1, IPC_CREAT|0666)) == -1) {
+				return 1;
+			}
 
-			// 결과값 쓰기 -> 생산자, 소비자 분리해서 각각 보내는 걸로 구현하기
-			write(client_fd_arr[2], &myData, sizeof(myData));
-			
-			close(client_fd_arr[2]);
+			if ((sharedMemory = shmat(shmid, NULL, 0)) == (void *)-1) {
+				return 1;
+			}
 
-			exit(0);
+			sharedData = (struct Data *)sharedMemory;
+
+			strcpy(sem_union.val.msg, myData.msg);
+			sem_union.val.num = myData.num;
+		
+			if (semctl(semid, 0, SETVAL, sem_union) == -1) {
+				return 1;
+			}
+
+			// 생산자, 소비자 프로세스 생성
+			int pid_prod, pid_cons;
+
+			pid_prod = fork(); // 생산자
+
+			if (pid_prod > 0) {
+				pid_cons = fork(); // 소비자
+			}
+
+			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
+			for (;;) {
+				if (pid_prod == 0) {
+					semop(semid, &semopen, 1);
+					sharedData = handleData(sharedData);
+					write(client_arr[2].fd, &sharedData, sizeof(sharedData));
+					sleep(1);
+					semop(semid, &semclose, 1);
+				}
+
+				if (pid_cons == 0) {
+					semop(semid, &semopen, 1);
+					sharedData = handleData(sharedData);
+					write(client_arr[2].fd, &sharedData, sizeof(sharedData));
+					sleep(1);
+					semop(semid, &semclose, 1);
+				}
+			}
 
 		} else {
 			perror("failed to read");
-			close(client_fd_arr[2]);
+			close(client_arr[2].fd);
 			return -1;
 		}
 	}

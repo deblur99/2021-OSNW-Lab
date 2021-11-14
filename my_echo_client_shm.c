@@ -47,7 +47,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-
     // 입력받은 문자열, 정수를 myData 구조체에 저장
     char *buf = malloc(sizeof(MAXBUF));
     printf("input string : ");
