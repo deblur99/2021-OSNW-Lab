@@ -176,6 +176,9 @@ int main(int argc, char **argv) {
 
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
+				// debug
+					printf("Producer1 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
+				
 				struct Data *local_var, *cal_data;
 				
 				if ((shmid = shmget((key_t)5, sizeof(myData), 0666|IPC_CREAT)) == -1) {
@@ -195,20 +198,31 @@ int main(int argc, char **argv) {
 
 				cal_data = (struct Data *)sharedMemory;
 
+				// debug
+					printf("Producer1 : %s, %d\n", cal_data->msg, cal_data->num);
+
+
 				if (semctl(semid, 0, SETVAL, sem_union) == -1) {
 					perror("semctl error");
 					return 1;
 				}
+
+				// debug
+					printf("Producer1 : %s, %d\n", cal_data->msg, cal_data->num);
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
 						perror("semop error");
 						return 1;
 					}
+					
+					// debug
+					printf("Producer1 : %s, %d\n", cal_data->msg, cal_data->num);
 
-					local_var = handleData(cal_data);
+					cal_data = handleData(cal_data);
 
-					cal_data = local_var;
+					// debug
+					printf("Producer1 : %s, %d\n", cal_data->msg, cal_data->num);
 
 					semop(semid, &semclose, 1);
 
@@ -217,6 +231,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
+				// debug
+					printf("Consumer1 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
+
 				struct Data *local_var, *cal_data;
 
 				if ((shmid = shmget((key_t)5, sizeof(myData), 0666)) == -1) {
@@ -241,17 +258,19 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
+				// debug
+					printf("Consumer2 : %s, %d\n", cal_data->msg, cal_data->num);
+
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
 						perror("error");
 						return 1;
 					}
 
-					local_var = handleData(cal_data);
+					// debug
+					printf("Consumer2 : %s, %d\n", cal_data->msg, cal_data->num);
 	
 					write(client_arr[0].fd, cal_data, sizeof(cal_data));
-	
-					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
 
@@ -294,6 +313,8 @@ int main(int argc, char **argv) {
 
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
+				// debug
+					printf("Producer2 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
 				struct Data *local_var, *cal_data;
 
 				if ((shmid = shmget((key_t)163841, sizeof(myData), 0666|IPC_CREAT)) == -1) {
@@ -324,9 +345,7 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 
-					local_var = handleData(cal_data);
-
-					cal_data = local_var;
+					cal_data = handleData(cal_data);
 
 					semop(semid, &semclose, 1);
 
@@ -335,6 +354,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
+				// debug
+					printf("Consumer2 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
+
 				struct Data *local_var, *cal_data;
 
 				if ((shmid = shmget((key_t)163841, sizeof(myData), 0666)) == -1) {
@@ -364,12 +386,8 @@ int main(int argc, char **argv) {
 						perror("error");
 						return 1;
 					}
-
-					local_var = handleData(cal_data);
 	
 					write(client_arr[1].fd, cal_data, sizeof(cal_data));
-	
-					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
 
@@ -414,6 +432,9 @@ int main(int argc, char **argv) {
 
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
+				// debug
+					printf("Producer3 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
+
 				struct Data *local_var, *cal_data;
 
 				if ((shmid = shmget((key_t)196610, sizeof(myData), 0666|IPC_CREAT)) == -1) {
@@ -444,9 +465,7 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 
-					local_var = handleData(cal_data);
-
-					cal_data = local_var;
+					cal_data = handleData(cal_data);
 
 					semop(semid, &semclose, 1);
 
@@ -455,6 +474,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
+				// debug
+					printf("Consumer3 : %s, %d\n", sem_union.data->msg, sem_union.data->num);
+
 				struct Data *local_var, *cal_data;
 
 				if ((shmid = shmget((key_t)196610, sizeof(myData), 0666)) == -1) {
@@ -484,12 +506,8 @@ int main(int argc, char **argv) {
 						perror("semop error");
 						return 1;
 					}
-
-					local_var = handleData(cal_data);
 					
 					write(client_arr[2].fd, cal_data, sizeof(cal_data));
-	
-					cal_data = local_var;
 	
 					semop(semid, &semclose, 1);
 

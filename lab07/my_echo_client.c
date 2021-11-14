@@ -2,6 +2,7 @@
 #include <arpa/inet.h>   /* 소켓 지원을 위한 각종 함수 */
 #include <sys/stat.h>
 #include <stdio.h>      /* 표준 입출력 관련 */
+#include <stdlib.h>
 #include <string.h>     /* 문자열 관련 */
 #include <unistd.h>     /* 각종 시스템 함수 */
 #include <signal.h>
