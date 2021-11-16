@@ -2,28 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct Data {
+    int *n;
+};
+
 int main() {
-    char temp;
+    int *foo;
+    int bar;
+    struct Data s;
 
-    char s[1024] = {0, };
+    scanf("%d", &bar);
 
-    char input[1024] = {0, };
+    s.n = &bar;
 
-    scanf(" %[^\n]s", input);
-
-    printf("strlen: %ld\n", strlen(input));
-
-    strcpy(s, input);
-
-    for (int j = 0; j < strlen(s); j++) {
-        for (int i = 0; i < strlen(s) - 1; i++) {
-            temp = s[i];
-            s[i] = s[i + 1];
-            s[i + 1] = temp;
-        }
-
-        printf("%s\n", s);
-    }    
+    printf("%d\n", *(s.n));
      
     return 0;
 }

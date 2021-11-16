@@ -14,25 +14,19 @@ int sig_handler(int signo) {
     exit(0);
 }
 
-typedef struct _SendData {
+struct Data {
     char msg[MAXBUF];
     int num;
-}SendData;
-
-typedef struct _RecvData {
-    char msg[MAXBUF];
-    int *num;
-}RecvData;
+};
 
 int main(int argc, char **argv) {
     // 시그널 핸들러 함수 호출
-    signal(SIGINT, (void *)sig_handler);
+    signal(SIGINT, (void *)sig_handler); 
 
     struct sockaddr_in serveraddr;
     int server_sockfd;
     int client_len;
-    SendData myData = {{0, }, -1};
-    RecvData *recvData;
+    struct Data myData = {{0, }, -1};
 
     if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("error");
@@ -72,13 +66,13 @@ int main(int argc, char **argv) {
     // 이후에는 인터럽트 호출 전까지 서버로부터 문자열을 읽어온다.
     for (;;) {
         /* 서버로 부터 데이터를 읽는다. */
-        if (read(server_sockfd, &recvData, sizeof(recvData)) <= 0)
+        if (read(server_sockfd, &myData, sizeof(myData)) <= 0)
         {
             perror("read error"); // 예외
             return 1;
         }
 
-        printf("read : %s and %d\n", recvData->msg, *recvData->num); // 출력
+        printf("read : %s and %d\n", myData.msg, myData.num); // 출력
         
         sleep(1);
     }

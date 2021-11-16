@@ -29,17 +29,11 @@ struct ClientSocketInfo {
 	unsigned short port;	
 };
 
-// 클라이언트로부터 입력받는 구조체
-typedef struct _RecvData {
+// 클라이언트와 주고받을 구조체
+struct Data {
     char msg[MAXBUF];
     int num;
-}RecvData;
-
-// 클라이언트로 전달하는 구조체
-typedef struct _SendData {
-	char msg[MAXBUF];
-    int *num;
-}SendData;
+};
 
 union semun {
 	int val;
@@ -47,7 +41,7 @@ union semun {
 
 int main(int argc, char **argv) {
 	// 시그널 핸들러 함수 호출
-    signal(SIGINT, (void *)sig_handler);
+    signal(SIGINT, (void *)sig_handler); 
 
 	// 세마포어
 	struct sembuf semopen = {0, -1, SEM_UNDO};
@@ -55,8 +49,7 @@ int main(int argc, char **argv) {
 	
 	union semun semun_arr[MAX_CLIENTS];
 
-	RecvData recvData = {{0, }, -1};
-	SendData *sendData;
+	struct Data myData = {{0, }, -1};
 
     // 소켓 관련 변수, 버퍼 관련 변수 선언 및 초기화
 	int listen_fd, client_fd; // 각각 listen 소켓, connect 소켓
@@ -134,32 +127,25 @@ int main(int argc, char **argv) {
 	// 자식 프로세스 1
 	if (pid1 == 0) {
 		
-		if ((n = read(client_arr[0].fd, &recvData, sizeof(RecvData))) > 0) {
+		if ((n = read(client_arr[0].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
 			printf("Read Data %s(%d) : %d and %s\n",
 				client_arr[0].addr, client_arr[0].port, 
-				recvData.num, recvData.msg);
+				myData.num, myData.msg);
 
-			// sendData 크기만큼 공유 메모리 할당
-			strcpy(sendData->msg, recvData.msg);
-			sendData->num = &recvData.num;
-			
+			// myData 크기만큼 공유 메모리 할당
 			int shmid, semid;
 			void *sharedMemory = NULL;
-
-			printf("before fork\n"); //debug
 
 			// 소비자 프로세스 생성
 			int pid_cons = fork();
 
-			printf("after fork\n"); //debug
-
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {				
-				SendData *cal_data;
+				struct Data *cal_data;
 				
-				if ((shmid = shmget((key_t)5, sizeof(SendData), 0666|IPC_CREAT)) == -1) {
+				if ((shmid = shmget((key_t)5, sizeof(myData), 0666|IPC_CREAT)) == -1) {
 					perror("shmget error");
 					return 1;
 				}
@@ -174,9 +160,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
-				memset(cal_data->msg, 0, MAXBUF);
-				*(cal_data->num) = *(sendData->num);
+				cal_data = (struct Data *)sharedMemory;
 
 				semun_arr[0].val = 1;
 				if (semctl(semid, 0, SETVAL, semun_arr[0]) == -1) {
@@ -185,11 +169,11 @@ int main(int argc, char **argv) {
 				}
 
 				char temp;
-				int s_length = strlen(sendData->msg) - 1;
-
-				char result[MAXBUF] = {0, };
-				strcpy(result, sendData->msg);
-				sendData->num = recvData.num;
+				int s_length = strlen(myData.msg) - 1;
+				
+				struct Data local_var;
+				strcpy(local_var.msg, myData.msg);
+				local_var.num = myData.num;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -197,16 +181,18 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 
+					// 문자열 처리
 					for (int i = 0; i < s_length; i++) {
-						temp = result[i];
-						result[i] = result[i + 1];
-						result[i + 1] = temp;
-				 	}
+						temp = local_var.msg[i];
+						local_var.msg[i] = local_var.msg[i + 1];
+						local_var.msg[i + 1] = temp;
+					}
 
-					strcpy(sendData->msg, result);
+					strcpy(cal_data->msg, local_var.msg);
 
-					(*sendData->num)++;
-				
+					// 정수값 처리
+					cal_data->num = ++local_var.num;
+
 					semop(semid, &semclose, 1);
 
 					sleep(1);
@@ -214,9 +200,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
-				SendData *cal_data;
+				struct Data *cal_data;
 
-				if ((shmid = shmget((key_t)5, sizeof(sendData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)5, sizeof(myData), 0666)) == -1) {
 					perror("error");
 					return 1;
 				}
@@ -231,7 +217,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
+				cal_data = (struct Data *)sharedMemory;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -239,7 +225,7 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 	
-					write(client_arr[0].fd, cal_data, sizeof(SendData));
+					write(client_arr[0].fd, cal_data, sizeof(cal_data));
 	
 					semop(semid, &semclose, 1);
 
@@ -257,16 +243,14 @@ int main(int argc, char **argv) {
 
 	// 자식 프로세스 2
 	if (pid2 == 0) {
-		if ((n = read(client_arr[1].fd, &recvData, sizeof(RecvData))) > 0) {
+		if ((n = read(client_arr[1].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
 			printf("Read Data %s(%d) : %d and %s\n",
 				client_arr[1].addr, client_arr[1].port, 
-				recvData.num, recvData.msg);
+				myData.num, myData.msg);
 
-			// sendData 크기만큼 공유 메모리 할당
-			strcpy(sendData->msg, recvData.msg);
-			sendData->num = &recvData.num;
+			// myData 크기만큼 공유 메모리 및 세마포어 할당 및 생성
 			int shmid, semid;
 			void *sharedMemory = NULL;
 
@@ -275,9 +259,9 @@ int main(int argc, char **argv) {
 
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
-				SendData *cal_data;
+				struct Data *cal_data;
 
-				if ((shmid = shmget((key_t)32769, sizeof(SendData), 0666|IPC_CREAT)) == -1) {
+				if ((shmid = shmget((key_t)32769, sizeof(myData), 0666|IPC_CREAT)) == -1) {
 					perror("error");
 					return 1;
 				}
@@ -292,9 +276,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
-				memset(cal_data->msg, 0, MAXBUF);
-				*(cal_data->num) = *(sendData->num);
+				cal_data = (struct Data *)sharedMemory;
 
 				semun_arr[1].val = 1;
 				if (semctl(semid, 0, SETVAL, semun_arr[1]) == -1) {
@@ -303,10 +285,11 @@ int main(int argc, char **argv) {
 				}
 
 				char temp;
-				int s_length = strlen(sendData->msg) - 1;
-
-				char result[MAXBUF] = {0, };
-				strcpy(result, sendData->msg);
+				int s_length = strlen(myData.msg) - 1;
+				
+				struct Data local_var;
+				strcpy(local_var.msg, myData.msg);
+				local_var.num = myData.num;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -314,16 +297,18 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 
+					// 문자열 처리
 					for (int i = 0; i < s_length; i++) {
-						temp = result[i];
-						result[i] = result[i + 1];
-						result[i + 1] = temp;
-				 	}
+						temp = local_var.msg[i];
+						local_var.msg[i] = local_var.msg[i + 1];
+						local_var.msg[i + 1] = temp;
+					}
 
-					strcpy(cal_data->msg, result);
+					strcpy(cal_data->msg, local_var.msg);
 
-					(*cal_data->num)++;
-				
+					// 정수값 처리
+					cal_data->num = ++local_var.num;
+
 					semop(semid, &semclose, 1);
 
 					sleep(1);
@@ -331,9 +316,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
-				SendData *cal_data;
+				struct Data  *cal_data;
 
-				if ((shmid = shmget((key_t)32769, sizeof(SendData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)32769, sizeof(myData), 0666)) == -1) {
 					perror("error");
 					return 1;
 				}
@@ -348,7 +333,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
+				cal_data = (struct Data *)sharedMemory;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -356,7 +341,7 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 	
-					write(client_arr[1].fd, cal_data, sizeof(SendData));
+					write(client_arr[1].fd, cal_data, sizeof(cal_data));
 	
 					semop(semid, &semclose, 1);
 
@@ -373,16 +358,14 @@ int main(int argc, char **argv) {
 	
 	// 자식 프로세스 3
 	if (pid3 == 0) {
-		if ((n = read(client_arr[2].fd, &recvData, sizeof(RecvData))) > 0) {
+		if ((n = read(client_arr[2].fd, &myData, sizeof(myData))) > 0) {
 
 			// 입력받은 값 출력
 			printf("Read Data %s(%d) : %d and %s\n",
 				client_arr[2].addr, client_arr[2].port, 
-				recvData.num, recvData.msg);
+				myData.num, myData.msg);
 
-			// sendData 크기만큼 공유 메모리 할당
-			strcpy(sendData->msg, recvData.msg);
-			sendData->num = &recvData.num;
+			// myData 크기만큼 공유 메모리 및 세마포어 할당 및 생성
 			int shmid, semid;
 			void *sharedMemory = NULL;
 
@@ -391,9 +374,9 @@ int main(int argc, char **argv) {
 
 			// 생산자, 소비자 프로세스는 각각 공유 메모리에 순차적으로 접근하여 처리한다.
 			if (pid_cons > 0) {
-				SendData *cal_data;
+				struct Data *cal_data;
 
-				if ((shmid = shmget((key_t)65538, sizeof(SendData), 0666|IPC_CREAT)) == -1) {
+				if ((shmid = shmget((key_t)65538, sizeof(myData), 0666|IPC_CREAT)) == -1) {
 					perror("shmget error");
 					return 1;
 				}
@@ -408,9 +391,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
-				memset(cal_data->msg, 0, MAXBUF);
-				*(cal_data->num) = *(sendData->num);
+				cal_data = (struct Data *)sharedMemory;
 
 				semun_arr[2].val = 1;
 				if (semctl(semid, 0, SETVAL, semun_arr[2]) == -1) {
@@ -419,10 +400,11 @@ int main(int argc, char **argv) {
 				}
 
 				char temp;
-				int s_length = strlen(sendData->msg) - 1;
+				int s_length = strlen(myData.msg) - 1;
 
-				char result[MAXBUF] = {0, };
-				strcpy(result, sendData->msg);
+				struct Data local_var;
+				strcpy(local_var.msg, myData.msg);
+				local_var.num = myData.num;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -430,16 +412,18 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 
+					// 문자열 처리
 					for (int i = 0; i < s_length; i++) {
-						temp = result[i];
-						result[i] = result[i + 1];
-						result[i + 1] = temp;
-				 	}
+						temp = local_var.msg[i];
+						local_var.msg[i] = local_var.msg[i + 1];
+						local_var.msg[i + 1] = temp;
+					}
 
-					strcpy(cal_data->msg, result);
+					strcpy(cal_data->msg, local_var.msg);
 
-					(*cal_data->num)++;
-				
+					// 정수값 처리
+					cal_data->num = ++local_var.num;
+
 					semop(semid, &semclose, 1);
 
 					sleep(1);
@@ -447,9 +431,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (pid_cons == 0) {
-				SendData *cal_data;
+				struct Data *cal_data;
 
-				if ((shmid = shmget((key_t)65538, sizeof(SendData), 0666)) == -1) {
+				if ((shmid = shmget((key_t)65538, sizeof(myData), 0666)) == -1) {
 					perror("shmget error");
 					return 1;
 				}
@@ -464,7 +448,7 @@ int main(int argc, char **argv) {
 					return 1;
 				}
 
-				cal_data = (SendData *)sharedMemory;
+				cal_data = (struct Data *)sharedMemory;
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
@@ -472,7 +456,7 @@ int main(int argc, char **argv) {
 						return 1;
 					}
 					
-					write(client_arr[2].fd, cal_data, sizeof(SendData));
+					write(client_arr[2].fd, cal_data, sizeof(cal_data));
 	
 					semop(semid, &semclose, 1);
 

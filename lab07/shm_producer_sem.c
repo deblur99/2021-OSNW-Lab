@@ -65,3 +65,8 @@ int main(int argc, char **argv)
 	return 1;
 }
 
+/*
+int local_var = 0;
+local_var = cal_data->num + 1;
+cal_data->num = local_var;
+*/
