@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in serveraddr;
     int server_sockfd;
     int client_len;
+
     struct Data myData = {{0, }, -1};
 
     if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {

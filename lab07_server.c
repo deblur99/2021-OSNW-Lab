@@ -13,10 +13,6 @@
 #define MAXBUF 1024
 #define MAX_CLIENTS 3
 
-// PIPE file descriptor index
-#define READ 0
-#define WRITE 1
-
 // SIGINT가 발생하면 프로그램 종료
 int sig_handler(int signo) {
     exit(0);
@@ -77,7 +73,7 @@ int main(int argc, char **argv) {
 
     // 서버 관련 구조체의 정보와 listen 소켓을 묶음
 	if (bind(listen_fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-        printf("An error occurred\n");
+        perror("An error occurred");
         return -1;
     }
 
@@ -190,8 +186,7 @@ int main(int argc, char **argv) {
 
 					strcpy(cal_data->msg, local_var.msg);
 
-					// 정수값 처리
-					cal_data->num = ++local_var.num;
+                    local_var.num++;
 
 					semop(semid, &semclose, 1);
 
@@ -306,8 +301,7 @@ int main(int argc, char **argv) {
 
 					strcpy(cal_data->msg, local_var.msg);
 
-					// 정수값 처리
-					cal_data->num = ++local_var.num;
+                    local_var.num++;
 
 					semop(semid, &semclose, 1);
 
@@ -421,8 +415,7 @@ int main(int argc, char **argv) {
 
 					strcpy(cal_data->msg, local_var.msg);
 
-					// 정수값 처리
-					cal_data->num = ++local_var.num;
+                    local_var.num++;
 
 					semop(semid, &semclose, 1);
 
@@ -452,10 +445,10 @@ int main(int argc, char **argv) {
 
 				for (;;) {
 					if (semop(semid, &semopen, 1) == -1) {
-						perror("semop error");
+						perror("error");
 						return 1;
 					}
-					
+	
 					write(client_arr[2].fd, cal_data, sizeof(cal_data));
 	
 					semop(semid, &semclose, 1);
