@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     // 입력받은 문자열, 정수를 myData 구조체에 저장
     char *buf = malloc(sizeof(MAXBUF));
     printf("input string : ");
-    scanf("%s", buf);
+    scanf(" %[^\n]s", buf);
     strcpy(myData.msg, buf);
     free(buf);
 
