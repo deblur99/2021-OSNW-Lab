@@ -128,19 +128,6 @@ int main(int argc, char **argv) {
 
 	// 자식 프로세스 1
 	if (pid1 == 0) {
-		// 생산자, 소비자 프로세스 생성
-		int pid1_prod, pid1_cons;
-
-		pid1_prod = fork(); // 생산자
-
-		if (pid1_prod > 0) {
-			pid1_cons = fork(); // 소비자
-		}
-
-		
-
-
-
 		memset(buf, 0x00, MAXBUF);
 
 		if ((n = read(client_fd_arr[0], buf, MAXBUF)) > 0) {
@@ -169,9 +156,6 @@ int main(int argc, char **argv) {
 
 	// 자식 프로세스 2
 	if (pid2 == 0) {
-		// 생산자, 소비자 프로세스 생성
-		int pid2_prod, pid2_cons;
-
 		memset(buf, 0x00, MAXBUF);
 
 		if ((n = read(client_fd_arr[1], buf, MAXBUF)) > 0) {
@@ -200,9 +184,6 @@ int main(int argc, char **argv) {
 	
 	// 자식 프로세스 3
 	if (pid3 == 0) {
-		// 생산자, 소비자 프로세스 생성
-		int pid3_prod, pid3_cons;
-
 		memset(buf, 0x00, MAXBUF);
 
 		if ((n = read(client_fd_arr[2], buf, MAXBUF)) > 0) {

@@ -6,15 +6,29 @@
 #include <string.h>     /* 문자열 관련 */
 #include <unistd.h>     /* 각종 시스템 함수 */
 
+#define STR_LENGTH 20
 #define MAXLINE    1024
+
+struct Data {
+    char str[STR_LENGTH];
+    int num;
+};
 
 int main(int argc, char **argv)
 {
+    // 소켓 관련 변수 선언 및 초기화
     struct sockaddr_in serveraddr;
     int server_sockfd;
     int client_len;
     char buf[MAXLINE];
 
+    // 송수신할 데이터 구조체 선언 및 초기화
+    struct Data sendData = {{0, }, 0};
+    struct Data recvData = {{0, }, 0};
+    
+    char str_buf[20] = {0, };
+
+    // 소켓 생성
     if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
     {
         perror("error :");
@@ -36,24 +50,34 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    memset(buf, 0x00, MAXLINE);
-    read(0, buf, MAXLINE);    /* 키보드 입력을 기다린다. */
-    if (write(server_sockfd, buf, MAXLINE) <= 0) /* 입력 받은 데이터를 서버로 전송한다. */
-    {
+    // 사용자로부터 입력 받아 sendData에 저장
+    printf("input string : ");
+    scanf("%s", buf);
+
+    if (strlen(buf) < STR_LENGTH) {
+        strcpy(sendData.str, buf);
+    } else {
+        printf("receive error");
+        return 1;
+    }
+
+    printf("input integer : ");
+    scanf("%d", &sendData.num);
+
+    /* 입력 받은 데이터를 서버로 전송한다. */
+    if (write(server_sockfd, &sendData, sizeof(sendData)) <= 0) {
         perror("write error : ");
         return 1;
     }
 
-    for (;;) {
-        memset(buf, 0x00, MAXLINE);
+    for (int i = 0; i < 1; i++) {
         /* 서버로 부터 데이터를 읽는다. */
-        if (read(server_sockfd, buf, MAXLINE) <= 0)
-        {
+        if (read(server_sockfd, &recvData, sizeof(recvData)) <= 0) {
             perror("read error : ");
             return 1;
         }
 
-        printf("read : %s", buf);
+        printf("read : %s and %d", recvData.str, recvData.num);
     }
     
     return 0;
