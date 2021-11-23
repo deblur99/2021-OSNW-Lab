@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
     // 사용자로부터 입력 받아 sendData에 저장
     printf("input string : ");
-    scanf("%s", buf);
+    scanf("%[^\n]s", buf);
 
     if (strlen(buf) < STR_LENGTH) {
         strcpy(sendData.str, buf);
