@@ -15,8 +15,16 @@
 #define PORTNUM 3600
 #define SOCK_SETSIZE 1021
 
+// 송수신애 사용할 데이터
+struct _Data {
+	char str[MAXLINE - sizeof(int)];
+    int num;
+};
+
 int main(int argc, char **argv)
 {
+	struct _Data data = {{0, }, 0};
+
 	int listen_fd, client_fd;
 	socklen_t addrlen;
 	int fd_num;
