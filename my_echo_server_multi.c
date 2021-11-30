@@ -23,7 +23,6 @@ struct _Data {
 
 int main(int argc, char **argv) {
 	// 초기화
-	struct _Data data = {{0, }, 0};
 	struct _Data *recv;
 	struct _Data *send;
 
@@ -69,9 +68,7 @@ int main(int argc, char **argv) {
 
 	for (;;) {
 		allfds = readfds;
-		printf("Select Wait %d\n", maxfd);
-		fd_num = select(maxfd + 1 , &allfds, (fd_set *)0,
-					  (fd_set *)0, NULL);
+		fd_num = select(maxfd + 1 , &allfds, NULL, NULL, NULL);
 
 		// listen 소켓에서는 클라이언트와의 연결을 수행한다.
 		if (FD_ISSET(listen_fd, &allfds))
@@ -80,7 +77,7 @@ int main(int argc, char **argv) {
 			client_fd = accept(listen_fd,
 					(struct sockaddr *)&client_addr, &addrlen);
 
-			FD_SET(client_fd,&readfds);
+			FD_SET(client_fd, &readfds);
 
 			if (client_fd > maxfd)
 				maxfd = client_fd; // socket fd 테이블에 연결 성공한 connect 소켓 추가

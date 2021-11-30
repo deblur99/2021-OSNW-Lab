@@ -23,7 +23,6 @@ int main(int argc, char **argv)
     int fd_num;
     int maxfd = 0, sockfd;
     fd_set readfds, allfds;
-    struct timeval timeout;
 
     char buf[MAXLINE];
     char *tok = NULL;
@@ -61,10 +60,8 @@ int main(int argc, char **argv)
     for (;;) {
         // init
         allfds = readfds;
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
 
-        if (select(maxfd, &allfds, NULL, NULL, &timeout) == 1) {
+        if (select(maxfd, &allfds, NULL, NULL, NULL) == 1) {
             perror("select error");
             return 1;
         }
