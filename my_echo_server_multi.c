@@ -67,9 +67,58 @@ int main(int argc, char **argv) {
 	maxfd = listen_fd; // 여기까지가 listen_fd 및 file descriptor table 초기화 부분이었음
 
 	for (;;) {
+		// init
 		allfds = readfds;
 		fd_num = select(maxfd + 1 , &allfds, NULL, NULL, NULL);
 
+		for (int i = 0; i < maxfd + 1; i++) {
+			if (FD_ISSET(listen_fd, &allfds)) {
+				if (i == listen_fd) {
+					addrlen = sizeof(client_addr);
+					client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addrlen);
+
+					if (client_fd == -1) {
+						perror("failed to connect client");
+						continue;
+					}
+
+					printf("Accept : %s\n", inet_ntoa(client_addr.sin_addr));
+					
+					FD_SET(client_fd, &readfds);
+
+					if (maxfd < client_fd) {
+						maxfd = client_fd;
+					}
+				}
+
+				else if (i == client_fd) {
+					if (read(i, recv, MAXLINE) == -1) {
+						perror("failed to read");
+						FD_CLR(i, &readfds);
+						close(i);
+						continue;
+					}
+
+					printf("from client %d: %s, %d\n", i, recv->str, recv->num);
+
+					// 입력 데이터 조작
+					if (send == NULL) {
+						strcpy(send->str, recv->str);
+						send->num = recv->num;
+					}
+
+					else {
+						strcat(send->str, recv->str);
+						send->num += recv->num;
+					}
+
+					write(sockfd, send, MAXLINE);
+				}
+			}
+		}
+
+		/*
+		// old
 		// listen 소켓에서는 클라이언트와의 연결을 수행한다.
 		if (FD_ISSET(listen_fd, &allfds))
 		{
@@ -129,7 +178,8 @@ int main(int argc, char **argv) {
 
 				if (--fd_num <= 0)
 					break;
-			}
+			}	
 		}
+		*/
 	}
 }
