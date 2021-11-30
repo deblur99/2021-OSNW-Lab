@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     int client_len;
 
     int fd_num;
-    int maxfd = 0, sockfd;
+    int maxfd = 0;
     fd_set readfds, allfds;
 
     char buf[MAXLINE];
@@ -53,24 +53,39 @@ int main(int argc, char **argv)
     // socket fd table 초기화
     FD_ZERO(&readfds);
     FD_SET(0, &readfds);
-    FD_SET(sockfd, &readfds);
+    FD_SET(server_sockfd, &readfds);
 
-    maxfd = sockfd + 1;
+    maxfd = server_sockfd;
 
     for (;;) {
-        // init
+        // fd 테이블 초기화
         allfds = readfds;
-        fd_num = select(maxfd + 1, &allfds, NULL, NULL, NULL);
+        fd_num = select(maxfd + 1, &allfds, (fd_set *) 0, (fd_set *) 0, NULL);
+
+        if (FD_ISSET(server_sockfd, &allfds)) {
+			addrlen = sizeof(client_addr);
+			client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addrlen);
+
+			if (client_fd == -1) {
+				perror("failed to connect client");
+				continue;
+			}
+
+			printf("Accept : %s\n", inet_ntoa(client_addr.sin_addr));
+			
+			FD_SET(client_fd, &readfds);
+			
+			continue;
+		}
 
         for (int i = 0; i < maxfd + 1; i++) {
-            // read() from user and write() to server
             if (FD_ISSET(0, &allfds)) {
                 // 문자열 버퍼 및 구조체 초기화
                 memset(buf, 0, MAXLINE);
                 memset(&data, 0, MAXLINE);
 
                 // 사용자로부터 키 입력 받기
-                read(0, buf, MAXLINE);    
+                read(0, buf, MAXLINE); 
 
                 // 입력 버퍼의 내용을 data 구조체에 저장하기 위해 공백 기준으로 분할
                 char *tok = (char *)malloc(MAXLINE);
@@ -79,32 +94,31 @@ int main(int argc, char **argv)
                 tok = strtok(buf, " ");
 
                 // 문자열 부분이 quit과 일치하면 프로그램 종료
-                if (strcmp(tok, "quit")) {
+                if (strcmp(tok, "quit") == 0) {
                     break;  
                 }
 
                 strcpy(data.str, tok);  // data 구조체에 문자열 저장
 
                 tok = strtok(NULL, " ");
+
                 data.num = atoi(tok);   // data 구조체에 정수 저장
 
-                free(tok);
+                // debug
+                printf("to %d : %s %d\n", server_sockfd, data.str, data.num);
 
                 // 서버에 입력받은 구조체 전달
                 if (write(server_sockfd, &data, MAXLINE) <= 0) {
                     perror("write error : ");
                     return 1;
-                }
+                }  
             }
 
             else if (i == server_sockfd) {
-                FD_SET(i, &readfds);
-                
                 memset(&data, 0, MAXLINE);
 
                 // 서버로부터 데이터 읽기
-                if (read(i, &data, MAXLINE) <= 0)
-                {
+                if (read(server_sockfd, &data, MAXLINE) <= 0) {
                     perror("read error : ");
                     return 1;
                 }
@@ -112,25 +126,9 @@ int main(int argc, char **argv)
                 printf("read : %s and %d\n", data.str, data.num);
             }
         }
-
-        /*
-        // read() from server
-        if (FD_ISSET(sockfd, &allfds)) {
-            memset(&data, 0, MAXLINE);
-
-            // 서버로부터 데이터 읽기
-            if (read(server_sockfd, &data, MAXLINE) <= 0)
-            {
-                perror("read error : ");
-                return 1;
-            }
-
-            printf("read : %s and %d\n", data.str, data.num);
-        }
-        */
     }
 
-    close(sockfd);
+    close(server_sockfd);
 
     return 0;
 }

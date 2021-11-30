@@ -21,18 +21,18 @@ struct _Data {
     int num;
 };
 
+static struct _Data sendData = {{0, }, 0};
+
 int main(int argc, char **argv) {
 	// 초기화
-	struct _Data *recv;
-	struct _Data *send;
-
+	struct _Data recvData = {{0, }, 0};
+	
 	int listen_fd, client_fd;
 	socklen_t addrlen;
 
 	int fd_num;
-	int maxfd = 0, sockfd;
+	int maxfd = 0;
 
-	int i= 0;
 	char buf[MAXLINE];
 	fd_set readfds, allfds;
 
@@ -69,117 +69,49 @@ int main(int argc, char **argv) {
 	for (;;) {
 		// init
 		allfds = readfds;
-		fd_num = select(maxfd + 1 , &allfds, NULL, NULL, NULL);
 
-		for (int i = 0; i < maxfd + 1; i++) {
-			if (FD_ISSET(listen_fd, &allfds)) {
-				if (i == listen_fd) {
-					addrlen = sizeof(client_addr);
-					client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addrlen);
+		fd_num = select(maxfd + 1, &allfds, (fd_set *) 0, (fd_set *) 0, NULL);
+		memset(&recvData, 0, MAXLINE);
 
-					if (client_fd == -1) {
-						perror("failed to connect client");
-						continue;
-					}
-
-					printf("Accept : %s\n", inet_ntoa(client_addr.sin_addr));
-					
-					FD_SET(client_fd, &readfds);
-
-					if (maxfd < client_fd) {
-						maxfd = client_fd;
-					}
-				}
-
-				else if (i == client_fd) {
-					if (read(i, recv, MAXLINE) == -1) {
-						perror("failed to read");
-						FD_CLR(i, &readfds);
-						close(i);
-						continue;
-					}
-
-					printf("from client %d: %s, %d\n", i, recv->str, recv->num);
-
-					// 입력 데이터 조작
-					if (send == NULL) {
-						strcpy(send->str, recv->str);
-						send->num = recv->num;
-					}
-
-					else {
-						strcat(send->str, recv->str);
-						send->num += recv->num;
-					}
-
-					write(sockfd, send, MAXLINE);
-				}
-			}
-		}
-
-		/*
-		// old
-		// listen 소켓에서는 클라이언트와의 연결을 수행한다.
-		if (FD_ISSET(listen_fd, &allfds))
-		{
+		if (FD_ISSET(listen_fd, &allfds)) {
 			addrlen = sizeof(client_addr);
-			client_fd = accept(listen_fd,
-					(struct sockaddr *)&client_addr, &addrlen);
+			client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addrlen);
 
-			FD_SET(client_fd, &readfds);
-
-			if (client_fd > maxfd)
-				maxfd = client_fd; // socket fd 테이블에 연결 성공한 connect 소켓 추가
+			if (client_fd == -1) {
+				perror("failed to connect client");
+				continue;
+			}
 
 			printf("Accept : %s\n", inet_ntoa(client_addr.sin_addr));
-
+			
+			FD_SET(client_fd, &readfds);
+			
 			continue;
 		}
 
-		for (i = 0; i <= maxfd; i++) {
-			sockfd = i;
+		for (int i = 0; i < maxfd; i++) {
+			if (FD_ISSET(client_fd, &allfds)) {
 
-			// 테이블 내 소켓들 중 connect 소켓을 찾고, 해당 소켓들에 통신 수행
-			if (FD_ISSET(sockfd, &allfds)) {
-				memset(recv, 0x00, MAXLINE);
+				if (read(i, &recvData, MAXLINE) < 0) {
+					perror("failed to read");
+					continue;
+				} else {
+					if (strcmp(recvData.str, "quit") == 0) {
+						close(i);
+					} else {
+						printf("from client %d: %s, %d\n", i, recvData.str, recvData.num);
 
-				// 소켓으로부터 데이터 수신을 실패하면 해당 소켓을 닫음
-				if (read(sockfd, recv, MAXLINE) <= 0) {
-					close(sockfd);
-					FD_CLR(sockfd, &readfds);
-				}
-				
-				// connect 소켓에서 데이터 받으면 처리 후 출력
-				else {
-					// quit 문자열을 입력받으면 해당 소켓을 닫음
-					if (strcmp(recv->str, "quit") == 0) {
-						close(sockfd);
-						FD_CLR(sockfd, &readfds);
-					}
+						strcat(sendData.str, recvData.str);
+						sendData.num += recvData.num;
 
-					// 구조체 멤버 각각 처리 후 다시 클라이언트에 전송
-					else {
-						printf("from client %d: %s, %d", sockfd, recv->str, recv->num);
+						// debug
+                		printf("to %d : %s %d\n", i, recvData.str, recvData.num);
 
-						// 입력 데이터 조작
-						if (send == NULL) {
-							strcpy(send->str, recv->str);
-							send->num = recv->num;
-						}
-
-						else {
-							strcat(send->str, recv->str);
-							send->num += recv->num;
-						}
-
-						write(sockfd, send, MAXLINE);
+						write(i, &sendData, MAXLINE);
 					}
 				}
-
-				if (--fd_num <= 0)
-					break;
-			}	
+			}				
 		}
-		*/
+		sleep(1);
 	}
 }
