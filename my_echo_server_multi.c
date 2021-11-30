@@ -27,9 +27,10 @@ int main(int argc, char **argv)
 
 	int listen_fd, client_fd;
 	socklen_t addrlen;
+
 	int fd_num;
-	int maxfd = 0;
-	int sockfd;
+	int maxfd = 0, sockfd;
+	
 	int i= 0;
 	char buf[MAXLINE];
 	fd_set readfds, allfds;
@@ -61,6 +62,7 @@ int main(int argc, char **argv)
 	FD_SET(listen_fd, &readfds);
 
 	maxfd = listen_fd; // 여기까지가 listen_fd 및 file descriptor table 초기화 부분이었음
+
 	while(1)
 	{
 		allfds = readfds;
