@@ -90,8 +90,7 @@ int main(int argc, char **argv) {
 		}
 
 		for (int i = 0; i < maxfd; i++) {
-			if (FD_ISSET(client_fd, &allfds)) {
-
+			if (FD_ISSET(i, &allfds) != 0) {
 				if (read(i, &recvData, MAXLINE) < 0) {
 					perror("failed to read");
 					continue;
@@ -110,8 +109,9 @@ int main(int argc, char **argv) {
 						write(i, &sendData, MAXLINE);
 					}
 				}
-			}				
+			}			
 		}
+
 		sleep(1);
 	}
 }

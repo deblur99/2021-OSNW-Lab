@@ -15,23 +15,38 @@
 #define MAX_CLIENTS 3
 
 struct Data {
-    char str[20];
+    char str[STR_LENGTH];
     int num;
 };
 
 // mutex 객체 선언
-static pthread_mutex_t mutex;
+static pthread_mutex_t t_lock;
+static pthread_cond_t t_cond;
 
-// 쓰레드에서 처리할 구조체
-static struct Data sendData[MAX_CLIENTS];
+// 송수신할 데이터 구조체 배열 선언 및 초기화
+struct Data recvData;
+struct Data sendData;
 
 // 생산자 : 클라이언트로부터 값 읽어옴
 void *producer_task(void *data) {
     pthread_t cons_thread_id;
+    int *client_fd = (int *)data; // client_fd from main thread
+    char buf[STR_LENGTH] = {0, }; // for receiving string
 
-    char buf[20] = {0, }; // for receiving string
+    if (read(*client_fd, recvData.str, sizeof(recvData.str)) <= 0) {
+        perror("failed to read string from client");
+        return 1;
+    }
+
+    if (read(*client_fd, &recvData.num, sizeof(recvData.num)) <= 0) {
+        perror("failed to read integer from client");
+        return 1;
+    }
+
+    printf("Read Data : %d and %s\n", recvData.num, recvData.str);
     
-    pthread_create(&cons_thread_id, NULL, consumer_task, )
+    pthread_create(&cons_thread_id, NULL, consumer_task, (void *)client_fd);
+    pthread_detach(cons_thread_id);
 }
 
 // 소비자 : 클라이언트로 처리한 값 전송
@@ -53,10 +68,6 @@ int main(int argc, char **argv) {
 
     // 쓰레드 관련 변수 선언 및 초기화
     pthread_t prod_thread_id;
-
-    // 송수신할 데이터 구조체 배열 선언 및 초기화
-    struct Data recvData[MAX_CLIENTS];
-    memset(recvData, 0, sizeof(recvData));
 
     char buf[20] = {0, }; // for receiving string
 
@@ -82,45 +93,12 @@ int main(int argc, char **argv) {
     listen(listen_fd, 5);
 
     // 서버와 클라이언트를 연결하여 client_fd_arr의 요소에 각각 저장
+    // 연결하면 클라이언트 소켓 fd를 보내며 생산자 워커 쓰레드 생성 후 detach
+    // 메인 쓰레드는 계속 listen 한다.
     for (;;) {
         client_fd = accept(listen_fd, (struct sockaddr *)&clientaddr, &client_len);
         pthread_create(&prod_thread_id, NULL, producer_task, (void *)&client_fd);
         pthread_detach(prod_thread_id);
-    }
-
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        
-    }
-
-    pthread_mutex_init(&mutex, NULL);
-    
-    pthread_create(&mutex, )
-
-    
-    // 이 지점부터 쓰레드 생성
-    // 클라이언트로부터 값 받기
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (read(client_fd_arr[i], recvData[i].str, sizeof(recvData[i].str)) <= 0) {
-            perror("failed to read string from client");
-            return 1;
-        }
-
-        if (read(client_fd_arr[i], &recvData[i].num, sizeof(recvData[i].num)) <= 0) {
-            perror("failed to read integer from client");
-            return 1;
-        }
-
-        printf("Read Data : %d and %s\n", recvData[i].num, recvData[i].str);
-    }
-
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        pthread_create(&worker_arr[i], NULL, )
-    }
-
-
-    // debug
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        close(client_fd_arr[i]);
     }
 
     return 0;    

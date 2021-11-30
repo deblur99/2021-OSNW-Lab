@@ -62,23 +62,8 @@ int main(int argc, char **argv)
         allfds = readfds;
         fd_num = select(maxfd + 1, &allfds, (fd_set *) 0, (fd_set *) 0, NULL);
 
-        if (FD_ISSET(server_sockfd, &allfds)) {
-			addrlen = sizeof(client_addr);
-			client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addrlen);
-
-			if (client_fd == -1) {
-				perror("failed to connect client");
-				continue;
-			}
-
-			printf("Accept : %s\n", inet_ntoa(client_addr.sin_addr));
-			
-			FD_SET(client_fd, &readfds);
-			
-			continue;
-		}
-
         for (int i = 0; i < maxfd + 1; i++) {
+            // 사용자로부터 입력받는 부분
             if (FD_ISSET(0, &allfds)) {
                 // 문자열 버퍼 및 구조체 초기화
                 memset(buf, 0, MAXLINE);
@@ -114,7 +99,8 @@ int main(int argc, char **argv)
                 }  
             }
 
-            else if (i == server_sockfd) {
+            // 서버로부터 읽는 부분
+            else if (FD_ISSET(server_sockfd, &allfds)) {
                 memset(&data, 0, MAXLINE);
 
                 // 서버로부터 데이터 읽기
