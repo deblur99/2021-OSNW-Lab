@@ -100,11 +100,10 @@ int main(int argc, char **argv) {
 					} else {
 						printf("from client %d: %s, %d\n", i, recvData.str, recvData.num);
 
+						strcat(sendData.str, " ");
 						strcat(sendData.str, recvData.str);
+						
 						sendData.num += recvData.num;
-
-						// debug
-                		printf("to %d : %s %d\n", i, recvData.str, recvData.num);
 
 						write(i, &sendData, MAXLINE);
 					}

@@ -89,9 +89,6 @@ int main(int argc, char **argv)
 
                 data.num = atoi(tok);   // data 구조체에 정수 저장
 
-                // debug
-                printf("to %d : %s %d\n", server_sockfd, data.str, data.num);
-
                 // 서버에 입력받은 구조체 전달
                 if (write(server_sockfd, &data, MAXLINE) <= 0) {
                     perror("write error : ");
