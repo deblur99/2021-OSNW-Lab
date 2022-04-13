@@ -8,14 +8,14 @@
 #include <unistd.h>
 
 #define BUF_SIZE 10000
-#define PORT     3888
+#define PORT     4000
 
-int main(int argc, int argv) {
+int main(int argc, char *argv[]) {
     // string buffer
     char *buf = malloc(sizeof(char) * BUF_SIZE);
     memset(buf, 0, BUF_SIZE);
     
-    int rbyte = 0;
+    int rbyte = 0, wbyte = 0;
 
     struct sockaddr_in client_addr, sock_addr;  // IPv4 Address
     socklen_t addr_len;                         // size of sock_addr
@@ -36,6 +36,7 @@ int main(int argc, int argv) {
     // after setting info of listening socket, then apply it
     if (bind(listen_sockfd, (struct sockaddr *)&sock_addr, sizeof(sock_addr)) == -1) {
         perror("bind() error");
+        close(listen_sockfd);
         return 1;
     }
 
@@ -43,6 +44,7 @@ int main(int argc, int argv) {
     // after calling listen() function, wait for connection request from client
     if (listen(listen_sockfd, 5) == -1) {
         perror("listen() error");
+        close(listen_sockfd);
         return 1;
     }
 
@@ -52,24 +54,46 @@ int main(int argc, int argv) {
     connect_sockfd = accept(listen_sockfd, (struct sockaddr *)&sock_addr, &addr_len);
     if (connect_sockfd == -1) {
         perror("accept() error");
+        close(listen_sockfd);
         return 1;
     }
 
-    // read(), write()
-    // read() : get data from opposite side which calls write() function
-    // write() : send data to opposite side which calls read() function
     for (;;) {
-        rbyte = read(connect_sockfd, buf, BUF_SIZE);
-        if (rbyte < 0) {
+        // read(), write()
+        // read() : get data from opposite side which calls write() function
+        // write() : send data to opposite side which calls read() function
+        if ((rbyte = read(connect_sockfd, buf, sizeof(buf))) <= 0) {            
             printf("Failed to read data\n");
-            close(connect_sockfd);
             break;
-        } else if (rbyte > 0) {
-            printf("Read data : %s\n", buf);
         }
-        memset(buf, 0, BUF_SIZE);
-    }
+        
+        // handle exception
+        if (rbyte >= BUF_SIZE) {
+            printf("Exceed BUF_SIZE\n");
+            break;
+        }
 
+        // 
+        if (strcmp(buf, "exit") == 0) {
+            printf("socket %d exit\n", connect_sockfd);
+            close(connect_sockfd);
+            close(listen_sockfd);
+            free(buf);
+            return 0;
+        }
+        printf("Read data : %s\n", buf);
+
+        // 입력받은 문자열을 그대로 클라이언트에 전송
+        if ((wbyte = write(connect_sockfd, buf, sizeof(buf))) <= 0) {
+            printf("Failed to write data\n");
+            break;
+        }
+
+        memset(buf, '\0', sizeof(buf));
+    }
+    
+    close(connect_sockfd);
+    close(listen_sockfd);
     free(buf);
-    return 0;
+    return 1;
 }

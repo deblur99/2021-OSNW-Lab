@@ -1,3 +1,5 @@
+// 1:1 client-server socket program.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +8,7 @@
 #include <unistd.h>
 
 #define BUF_SIZE    10000
-#define PORT        3888
+#define PORT        4000
 #define IP          "127.0.0.1"
 
 int main(int argc, char *argv[]) {
@@ -14,7 +16,7 @@ int main(int argc, char *argv[]) {
     char *buf = (char *)malloc(sizeof(char) * BUF_SIZE);
     memset(buf, 0, BUF_SIZE);
 
-    int sbyte;
+    int sbyte = 0, wbyte = 0;
 
     struct sockaddr_in addr;
     int connect_sockfd;
@@ -39,19 +41,29 @@ int main(int argc, char *argv[]) {
 
     for (;;) {
         scanf("%[^\n]s", buf);
-        sbyte = write(connect_sockfd, buf, strlen(buf));
-        if (sbyte < 0) {
+        
+        if ((sbyte = write(connect_sockfd, buf, strlen(buf))) <= 0) {
             printf("Failed to write data\n");
-            break;        
-        } else if (sbyte > 0) {
-            printf("Send data : %s\n", buf);
+            close(connect_sockfd);
+            free(buf);
+            return -1;        
         }
-        memset(buf, 0, BUF_SIZE);
-        fflush(stdin);
-        fflush(stdout);
+
+        if (strcmp(buf, "exit") == 0) {
+            printf("bye\n");
+            break;
+        }
+        printf("Send data : %s\n", buf);
+
+        if ((wbyte = read(connect_sockfd, buf, sizeof(buf))) <= 0) {
+            printf("Failed to read data\n");
+            break;
+        } 
+
+        memset(buf, 0, sizeof(buf));
     }
 
     close(connect_sockfd);
     free(buf);
-    return -1;
+    return 0;
 }
